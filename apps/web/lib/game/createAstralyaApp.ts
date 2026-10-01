@@ -76,7 +76,10 @@ function createPlayerMarker(displayName: string) {
   return player;
 }
 
-export async function createAstralyaApp(\n  host: HTMLDivElement,\n  options: { displayName: string },\n) {
+export async function createAstralyaApp(
+  host: HTMLDivElement,
+  options: { displayName: string },
+) {
   const app = new Application();
 
   await app.init({
