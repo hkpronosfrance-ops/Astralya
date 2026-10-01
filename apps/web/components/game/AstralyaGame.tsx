@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createAstralyaApp } from "@/lib/game/createAstralyaApp";
+import { createClient } from "@/lib/supabase/client";
 
 type AstralyaGameProps = {
   displayName: string;
@@ -21,7 +22,10 @@ export function AstralyaGame({
   startY,
 }: AstralyaGameProps) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
-  const [localPosition, setLocalPosition] = useState({ x: startX, y: startY });
+  const [serverPosition, setServerPosition] = useState({ x: startX, y: startY });
+  const [movementStatus, setMovementStatus] = useState<
+    "ready" | "moving" | "rejected"
+  >("ready");
 
   useEffect(() => {
     const host = canvasHostRef.current;
@@ -30,6 +34,7 @@ export function AstralyaGame({
       return;
     }
 
+    const supabase = createClient();
     let disposed = false;
     let cleanup: (() => void) | undefined;
 
@@ -37,9 +42,38 @@ export function AstralyaGame({
       displayName,
       startX,
       startY,
-      onPositionChange: (position) => {
+      validateStep: async (position) => {
+        if (disposed) {
+          return false;
+        }
+
+        setMovementStatus("moving");
+
+        const { data, error } = await supabase.functions.invoke(
+          "move-character-step",
+          {
+            body: {
+              target_x: position.x,
+              target_y: position.y,
+            },
+          },
+        );
+
+        if (
+          error ||
+          data?.position?.x !== position.x ||
+          data?.position?.y !== position.y
+        ) {
+          setMovementStatus("rejected");
+          return false;
+        }
+
+        setServerPosition(position);
+        return true;
+      },
+      onMoveComplete: () => {
         if (!disposed) {
-          setLocalPosition(position);
+          setMovementStatus("ready");
         }
       },
     }).then((destroy) => {
@@ -60,6 +94,13 @@ export function AstralyaGame({
   const healthPercent =
     maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
 
+  const statusLabel =
+    movementStatus === "moving"
+      ? "Validation serveur..."
+      : movementStatus === "rejected"
+        ? "Déplacement refusé"
+        : "Synchronisé";
+
   return (
     <section className="game-frame" aria-label="Prototype Astralya">
       <div ref={canvasHostRef} className="game-canvas" />
@@ -79,7 +120,7 @@ export function AstralyaGame({
             </div>
           </div>
 
-          <div className="hud-card prototype-badge">Prototype 0.2</div>
+          <div className="hud-card prototype-badge">Prototype 0.3</div>
         </div>
 
         <div />
@@ -89,8 +130,9 @@ export function AstralyaGame({
             <strong>Exploration</strong>
             <span>Clique sur une case pour te déplacer.</span>
             <small>
-              Position locale : {localPosition.x}, {localPosition.y}
+              Position serveur : {serverPosition.x}, {serverPosition.y}
             </small>
+            <small>{statusLabel}</small>
           </div>
 
           <div className="hud-card action-bar" aria-label="Barre d'actions">
