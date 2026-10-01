@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createAstralyaApp } from "@/lib/game/createAstralyaApp";
 
 type AstralyaGameProps = {
@@ -8,6 +8,8 @@ type AstralyaGameProps = {
   level: number;
   hp: number;
   maxHp: number;
+  startX: number;
+  startY: number;
 };
 
 export function AstralyaGame({
@@ -15,8 +17,11 @@ export function AstralyaGame({
   level,
   hp,
   maxHp,
+  startX,
+  startY,
 }: AstralyaGameProps) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
+  const [localPosition, setLocalPosition] = useState({ x: startX, y: startY });
 
   useEffect(() => {
     const host = canvasHostRef.current;
@@ -28,7 +33,16 @@ export function AstralyaGame({
     let disposed = false;
     let cleanup: (() => void) | undefined;
 
-    void createAstralyaApp(host, { displayName }).then((destroy) => {
+    void createAstralyaApp(host, {
+      displayName,
+      startX,
+      startY,
+      onPositionChange: (position) => {
+        if (!disposed) {
+          setLocalPosition(position);
+        }
+      },
+    }).then((destroy) => {
       if (disposed) {
         destroy();
         return;
@@ -41,7 +55,7 @@ export function AstralyaGame({
       disposed = true;
       cleanup?.();
     };
-  }, [displayName]);
+  }, [displayName, startX, startY]);
 
   const healthPercent =
     maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
@@ -65,12 +79,20 @@ export function AstralyaGame({
             </div>
           </div>
 
-          <div className="hud-card prototype-badge">Prototype 0.1</div>
+          <div className="hud-card prototype-badge">Prototype 0.2</div>
         </div>
 
         <div />
 
         <div className="hud-bottom">
+          <div className="movement-hint hud-card">
+            <strong>Exploration</strong>
+            <span>Clique sur une case pour te déplacer.</span>
+            <small>
+              Position locale : {localPosition.x}, {localPosition.y}
+            </small>
+          </div>
+
           <div className="hud-card action-bar" aria-label="Barre d'actions">
             {Array.from({ length: 6 }, (_, index) => (
               <div className="action-slot" key={index}>

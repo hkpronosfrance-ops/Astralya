@@ -21,7 +21,7 @@ export default async function HomePage() {
 
   const { data: character, error: characterError } = await supabase
     .from("characters")
-    .select("id, name, level, hp, max_hp")
+    .select("id, name, level, hp, max_hp, grid_x, grid_y")
     .maybeSingle();
 
   if (characterError) {
@@ -39,6 +39,8 @@ export default async function HomePage() {
         level={character.level}
         hp={character.hp}
         maxHp={character.max_hp}
+        startX={character.grid_x}
+        startY={character.grid_y}
       />
 
       <form action={signOut} className="logout-form">
