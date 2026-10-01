@@ -3,7 +3,19 @@
 import { useEffect, useRef } from "react";
 import { createAstralyaApp } from "@/lib/game/createAstralyaApp";
 
-export function AstralyaGame() {
+type AstralyaGameProps = {
+  displayName: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+};
+
+export function AstralyaGame({
+  displayName,
+  level,
+  hp,
+  maxHp,
+}: AstralyaGameProps) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,7 +28,7 @@ export function AstralyaGame() {
     let disposed = false;
     let cleanup: (() => void) | undefined;
 
-    void createAstralyaApp(host).then((destroy) => {
+    void createAstralyaApp(host, { displayName }).then((destroy) => {
       if (disposed) {
         destroy();
         return;
@@ -29,7 +41,10 @@ export function AstralyaGame() {
       disposed = true;
       cleanup?.();
     };
-  }, []);
+  }, [displayName]);
+
+  const healthPercent =
+    maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
 
   return (
     <section className="game-frame" aria-label="Prototype Astralya">
@@ -39,11 +54,14 @@ export function AstralyaGame() {
         <div className="hud-top">
           <div className="hud-card player-card">
             <div className="player-line">
-              <span>Hayati</span>
-              <span>Niv. 1</span>
+              <span>{displayName}</span>
+              <span>Niv. {level}</span>
             </div>
             <div className="status-bar" aria-label="Points de vie">
-              <span />
+              <span style={{ width: `${healthPercent}%` }} />
+            </div>
+            <div className="health-label">
+              {hp} / {maxHp} PV
             </div>
           </div>
 
