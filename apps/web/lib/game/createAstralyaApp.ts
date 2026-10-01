@@ -9,6 +9,24 @@ import {
 const TILE_WIDTH = 96;
 const TILE_HEIGHT = 48;
 const GRID_SIZE = 11;
+const PLAYER_Y_OFFSET = -18;
+const STEP_DURATION_MS = 135;
+
+type GridPosition = {
+  x: number;
+  y: number;
+};
+
+type AstralyaAppOptions = {
+  displayName: string;
+  startX: number;
+  startY: number;
+  onPositionChange?: (position: GridPosition) => void;
+};
+
+function clampGridCoordinate(value: number) {
+  return Math.max(0, Math.min(GRID_SIZE - 1, Math.round(value)));
+}
 
 function isoToScreen(gridX: number, gridY: number) {
   return {
@@ -19,7 +37,6 @@ function isoToScreen(gridX: number, gridY: number) {
 
 function createTile(gridX: number, gridY: number) {
   const tile = new Graphics();
-
   const shade = (gridX + gridY) % 2 === 0 ? 0x10243c : 0x0d1f35;
 
   tile
@@ -34,10 +51,12 @@ function createTile(gridX: number, gridY: number) {
       0,
     ])
     .fill({ color: shade })
-    .stroke({ color: 0x1d5c75, width: 1, alpha: 0.55 });
+    .stroke({ color: 0x1d5c75, width: 1, alpha: 0.62 });
 
   const position = isoToScreen(gridX, gridY);
   tile.position.set(position.x, position.y);
+  tile.eventMode = "static";
+  tile.cursor = "pointer";
 
   return tile;
 }
@@ -76,9 +95,80 @@ function createPlayerMarker(displayName: string) {
   return player;
 }
 
+function createTargetMarker() {
+  const marker = new Graphics()
+    .circle(0, 0, 11)
+    .fill({ color: 0x67e8f9, alpha: 0.2 })
+    .stroke({ color: 0x67e8f9, width: 2, alpha: 0.9 });
+
+  marker.visible = false;
+  return marker;
+}
+
+function buildPath(from: GridPosition, to: GridPosition) {
+  const path: GridPosition[] = [];
+  let x = from.x;
+  let y = from.y;
+
+  while (x !== to.x) {
+    x += x < to.x ? 1 : -1;
+    path.push({ x, y });
+  }
+
+  while (y !== to.y) {
+    y += y < to.y ? 1 : -1;
+    path.push({ x, y });
+  }
+
+  return path;
+}
+
+function easeInOut(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+async function animateStep(
+  player: Container,
+  from: GridPosition,
+  to: GridPosition,
+  isDisposed: () => boolean,
+) {
+  const fromScreen = isoToScreen(from.x, from.y);
+  const toScreen = isoToScreen(to.x, to.y);
+  const startedAt = performance.now();
+
+  await new Promise<void>((resolve) => {
+    const frame = (now: number) => {
+      if (isDisposed()) {
+        resolve();
+        return;
+      }
+
+      const rawProgress = Math.min(1, (now - startedAt) / STEP_DURATION_MS);
+      const progress = easeInOut(rawProgress);
+
+      player.position.set(
+        fromScreen.x + (toScreen.x - fromScreen.x) * progress,
+        fromScreen.y +
+          (toScreen.y - fromScreen.y) * progress +
+          PLAYER_Y_OFFSET,
+      );
+
+      if (rawProgress >= 1) {
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(frame);
+    };
+
+    requestAnimationFrame(frame);
+  });
+}
+
 export async function createAstralyaApp(
   host: HTMLDivElement,
-  options: { displayName: string },
+  options: AstralyaAppOptions,
 ) {
   const app = new Application();
 
@@ -95,16 +185,82 @@ export async function createAstralyaApp(
   const world = new Container();
   app.stage.addChild(world);
 
+  const currentPosition: GridPosition = {
+    x: clampGridCoordinate(options.startX),
+    y: clampGridCoordinate(options.startY),
+  };
+
+  const targetMarker = createTargetMarker();
+  const player = createPlayerMarker(options.displayName);
+  let moving = false;
+  let disposed = false;
+
+  const movePlayerToGrid = (position: GridPosition) => {
+    const screen = isoToScreen(position.x, position.y);
+    player.position.set(screen.x, screen.y + PLAYER_Y_OFFSET);
+  };
+
+  const moveTargetMarker = (position: GridPosition) => {
+    const screen = isoToScreen(position.x, position.y);
+    targetMarker.position.set(screen.x, screen.y);
+    targetMarker.visible = true;
+  };
+
+  const moveTo = async (destination: GridPosition) => {
+    if (
+      moving ||
+      (destination.x === currentPosition.x &&
+        destination.y === currentPosition.y)
+    ) {
+      return;
+    }
+
+    moving = true;
+    moveTargetMarker(destination);
+
+    const path = buildPath(currentPosition, destination);
+
+    for (const step of path) {
+      if (disposed) {
+        break;
+      }
+
+      const from = { ...currentPosition };
+      await animateStep(player, from, step, () => disposed);
+      currentPosition.x = step.x;
+      currentPosition.y = step.y;
+      options.onPositionChange?.({ ...currentPosition });
+    }
+
+    targetMarker.visible = false;
+    moving = false;
+  };
+
   for (let x = 0; x < GRID_SIZE; x += 1) {
     for (let y = 0; y < GRID_SIZE; y += 1) {
-      world.addChild(createTile(x, y));
+      const tile = createTile(x, y);
+
+      tile.on("pointerover", () => {
+        if (!moving) {
+          tile.tint = 0x9eeaf9;
+        }
+      });
+
+      tile.on("pointerout", () => {
+        tile.tint = 0xffffff;
+      });
+
+      tile.on("pointertap", () => {
+        tile.tint = 0xffffff;
+        void moveTo({ x, y });
+      });
+
+      world.addChild(tile);
     }
   }
 
-  const center = Math.floor(GRID_SIZE / 2);
-  const player = createPlayerMarker(options.displayName);
-  const playerPosition = isoToScreen(center, center);
-  player.position.set(playerPosition.x, playerPosition.y - 18);
+  world.addChild(targetMarker);
+  movePlayerToGrid(currentPosition);
   world.addChild(player);
 
   const positionWorld = () => {
@@ -130,6 +286,7 @@ export async function createAstralyaApp(
   app.renderer.on("resize", positionWorld);
 
   return () => {
+    disposed = true;
     app.renderer.off("resize", positionWorld);
     app.destroy(true, { children: true });
   };
