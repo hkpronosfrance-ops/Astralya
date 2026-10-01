@@ -152,3 +152,151 @@ input {
     height: 42px;
   }
 }
+
+.health-label {
+  margin-top: 6px;
+  color: #bae6fd;
+  font-size: 12px;
+  text-align: right;
+}
+
+.logout-form {
+  position: fixed;
+  z-index: 20;
+  top: 22px;
+  right: 150px;
+}
+
+.hud-button,
+.primary-button,
+.secondary-button {
+  border-radius: 10px;
+  border: 1px solid rgba(103, 232, 249, 0.34);
+  padding: 10px 14px;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.hud-button,
+.secondary-button {
+  background: rgba(5, 14, 28, 0.86);
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #0e7490, #2563eb);
+  font-weight: 800;
+}
+
+.auth-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.auth-card {
+  width: min(460px, 100%);
+  border: 1px solid rgba(103, 232, 249, 0.24);
+  border-radius: 22px;
+  padding: clamp(24px, 5vw, 42px);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.12), transparent 34%),
+    rgba(5, 14, 28, 0.94);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+}
+
+.character-create-card {
+  width: min(540px, 100%);
+}
+
+.auth-mark {
+  color: #67e8f9;
+  font-size: 34px;
+}
+
+.eyebrow {
+  margin: 8px 0;
+  color: #67e8f9;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.auth-card h1 {
+  margin: 8px 0 10px;
+  font-size: clamp(28px, 7vw, 44px);
+  line-height: 1;
+}
+
+.muted {
+  color: #a9b9cc;
+  line-height: 1.6;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+  color: #dbeafe;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-form input {
+  width: 100%;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 11px;
+  padding: 12px 13px;
+  outline: none;
+  background: #07111f;
+  color: #f8fafc;
+}
+
+.auth-form input:focus {
+  border-color: #22d3ee;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.form-error {
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(127, 29, 29, 0.2);
+  color: #fecaca;
+  font-size: 13px;
+}
+
+.subtle-link {
+  display: inline-block;
+  margin-top: 22px;
+  color: #93c5fd;
+}
+
+.link-button {
+  display: inline-block;
+  margin-top: 14px;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .logout-form {
+    top: auto;
+    right: 10px;
+    bottom: 72px;
+  }
+
+  .auth-actions {
+    grid-template-columns: 1fr;
+  }
+}
