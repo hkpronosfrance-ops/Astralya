@@ -34,4 +34,19 @@ Those fields are reserved for the authoritative game server in later phases.
 
 ## Database status
 
-`supabase/schema/phase_1_characters.sql` is a schema candidate, not a recorded migration. Once an Astralya Supabase project exists, create the migration through the Supabase CLI, apply it to the project, run security/performance advisors, then verify cross-user isolation.
+Astralya Supabase project: `ojyoisfbykoxqzaigcsb` in `eu-west-1`.
+
+Recorded migrations:
+
+- `20261001233355_phase_1_characters.sql`
+- `20261001233434_secure_rls_auto_enable_function.sql`
+
+Validation completed:
+
+- `characters` exists with RLS enabled;
+- ownership policies restrict reads/inserts to `auth.uid()`;
+- authenticated clients only receive INSERT on `name` and `appearance`;
+- no direct UPDATE grant is exposed to the browser;
+- Supabase security advisors: clean;
+- Supabase performance advisors: clean;
+- generated TypeScript database types are committed under `apps/web/lib/database.types.ts`.
