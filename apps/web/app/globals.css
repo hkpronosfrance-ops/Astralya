@@ -300,3 +300,38 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+.movement-hint {
+  position: absolute;
+  left: clamp(12px, 2vw, 24px);
+  bottom: clamp(12px, 2vw, 24px);
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  max-width: 260px;
+  color: #dbeafe;
+}
+
+.movement-hint strong {
+  color: #67e8f9;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.movement-hint span {
+  font-size: 13px;
+}
+
+.movement-hint small {
+  color: #7dd3fc;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .movement-hint {
+    left: 10px;
+    bottom: 72px;
+    max-width: 210px;
+  }
+}
