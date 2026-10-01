@@ -42,7 +42,7 @@ function createTile(gridX: number, gridY: number) {
   return tile;
 }
 
-function createPlayerMarker() {
+function createPlayerMarker(displayName: string) {
   const player = new Container();
 
   const shadow = new Graphics()
@@ -59,7 +59,7 @@ function createPlayerMarker() {
     .fill({ color: 0xe0f2fe });
 
   const label = new Text({
-    text: "Hayati",
+    text: displayName,
     style: new TextStyle({
       fill: 0xf8fafc,
       fontFamily: "Arial",
@@ -76,7 +76,7 @@ function createPlayerMarker() {
   return player;
 }
 
-export async function createAstralyaApp(host: HTMLDivElement) {
+export async function createAstralyaApp(\n  host: HTMLDivElement,\n  options: { displayName: string },\n) {
   const app = new Application();
 
   await app.init({
@@ -99,7 +99,7 @@ export async function createAstralyaApp(host: HTMLDivElement) {
   }
 
   const center = Math.floor(GRID_SIZE / 2);
-  const player = createPlayerMarker();
+  const player = createPlayerMarker(options.displayName);
   const playerPosition = isoToScreen(center, center);
   player.position.set(playerPosition.x, playerPosition.y - 18);
   world.addChild(player);
