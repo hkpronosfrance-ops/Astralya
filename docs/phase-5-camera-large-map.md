@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move from a small fit-to-screen prototype board to a larger explorable district with a camera that follows the player.
+Move from a small fit-to-screen prototype board to a larger explorable district with a camera that follows the player, while keeping movement fast and server-authoritative.
 
 ## Map
 
@@ -27,12 +27,29 @@ The whole map is no longer scaled down to fit the viewport.
 - movement stays centered while the world moves around the player;
 - resize updates scale and recenters immediately.
 
-## Movement
+## Movement v2
 
-- BFS pathfinding still uses orthogonal neighbors.
-- Expanded obstacle layout is shared conceptually between the client map and the server movement validator.
-- `move-character-step` Edge Function version 3 validates coordinates in the 25×25 map and rejects blocked cells.
-- Movement remains server-authoritative and persistent.
+The initial authoritative implementation validated every single tile with a separate network request. It was secure but too slow on a large map.
+
+Phase 5 now uses a destination-based authoritative flow:
+
+1. player clicks one destination;
+2. the browser sends one authenticated request;
+3. the Edge Function computes the BFS path server-side using the trusted collision map;
+4. the server persists only the approved destination;
+5. the server returns the complete approved path;
+6. PixiJS animates that path locally at ~60 ms per tile.
+
+This removes per-tile network latency while preserving server authority.
+
+## Security
+
+- the browser still has no direct UPDATE grant on `characters`;
+- the server computes the route and rejects blocked/unreachable destinations;
+- database persistence uses the authenticated user's current position as an optimistic-concurrency condition;
+- concurrent or stale movement requests are rejected;
+- path length is bounded;
+- `move-character-step` Edge Function version 4 handles destination-based movement.
 
 ## Transitions
 
