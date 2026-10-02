@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createAstralyaApp } from "@/lib/game/createAstralyaApp";
 import { createClient } from "@/lib/supabase/client";
+import { getElyndraDistrict } from "@/lib/game/maps/elyndraSpawn";
 
 type AstralyaGameProps = {
   displayName: string;
@@ -120,15 +121,15 @@ export function AstralyaGame({
             </div>
           </div>
 
-          <div className="hud-card prototype-badge">Prototype 0.4</div>
+          <div className="hud-card prototype-badge">Prototype 0.5</div>
         </div>
 
         <div />
 
         <div className="hud-bottom">
           <div className="movement-hint hud-card">
-            <strong>Elyndra · Place Astrale</strong>
-            <span>Clique sur une case pour te déplacer.</span>
+            <strong>Elyndra · {getElyndraDistrict(serverPosition)}</strong>
+            <span>La caméra suit ton personnage dans la zone.</span>
             <small>
               Position serveur : {serverPosition.x}, {serverPosition.y}
             </small>
