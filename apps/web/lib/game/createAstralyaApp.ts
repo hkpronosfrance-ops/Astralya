@@ -18,13 +18,13 @@ import {
 const TILE_WIDTH = 96;
 const TILE_HEIGHT = 48;
 const PLAYER_Y_OFFSET = -18;
-const STEP_DURATION_MS = 135;
+const STEP_DURATION_MS = 60;
 
 type AstralyaAppOptions = {
   displayName: string;
   startX: number;
   startY: number;
-  validateStep?: (position: GridPosition) => Promise<boolean>;
+  requestMove?: (destination: GridPosition) => Promise<GridPosition[] | null>;
   onMoveComplete?: () => void;
 };
 
@@ -449,24 +449,29 @@ export async function createAstralyaApp(
       return;
     }
 
-    const path = buildPath(currentPosition, destination);
+    moving = true;
+    moveTargetMarker(destination);
 
-    if (path.length === 0) {
+    const path =
+      (await options.requestMove?.(destination)) ??
+      buildPath(currentPosition, destination);
+
+    if (
+      disposed ||
+      path.length === 0 ||
+      gridKey(path[path.length - 1] ?? currentPosition) !== gridKey(destination)
+    ) {
+      targetMarker.visible = false;
+      clearPathPreview();
+      moving = false;
+      options.onMoveComplete?.();
       return;
     }
 
-    moving = true;
-    moveTargetMarker(destination);
     renderPathPreview(path);
 
     for (const step of path) {
       if (disposed) {
-        break;
-      }
-
-      const accepted = await options.validateStep?.(step);
-
-      if (accepted === false || disposed) {
         break;
       }
 
@@ -541,7 +546,7 @@ export async function createAstralyaApp(
     const scale = world.scale.x;
     const targetX = app.screen.width / 2 - player.position.x * scale;
     const targetY = app.screen.height * 0.48 - player.position.y * scale;
-    const smoothing = moving ? 0.13 : 0.2;
+    const smoothing = moving ? 0.24 : 0.2;
 
     world.position.x += (targetX - world.position.x) * smoothing;
     world.position.y += (targetY - world.position.y) * smoothing;
