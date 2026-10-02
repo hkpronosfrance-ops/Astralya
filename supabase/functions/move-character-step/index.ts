@@ -1,18 +1,38 @@
 import { withSupabase } from "npm:@supabase/server";
 
-const blockedCells = new Set([
-  "5,5",
-  "2,2",
-  "8,2",
-  "2,8",
-  "8,8",
-  "1,4",
-  "1,5",
-  "1,6",
-  "9,4",
-  "9,5",
-  "9,6",
-]);
+function isBlockedCell(x: number, y: number) {
+  if (x === 12 && y === 12) {
+    return true;
+  }
+
+  if (
+    (x === 8 && y === 8) ||
+    (x === 16 && y === 8) ||
+    (x === 8 && y === 16) ||
+    (x === 16 && y === 16)
+  ) {
+    return true;
+  }
+
+  if ((x === 5 || x === 19) && y >= 7 && y <= 17 && ![9, 12, 15].includes(y)) {
+    return true;
+  }
+
+  if ((y === 5 || y === 19) && x >= 7 && x <= 17 && ![9, 12, 15].includes(x)) {
+    return true;
+  }
+
+  if (
+    (x >= 2 && x <= 4 && y >= 2 && y <= 3) ||
+    (x >= 20 && x <= 22 && y >= 2 && y <= 3) ||
+    (x >= 2 && x <= 4 && y >= 21 && y <= 22) ||
+    (x >= 20 && x <= 22 && y >= 21 && y <= 22)
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,9 +58,9 @@ const protectedHandler = withSupabase(
       !Number.isInteger(targetX) ||
       !Number.isInteger(targetY) ||
       targetX < 0 ||
-      targetX > 10 ||
+      targetX > 24 ||
       targetY < 0 ||
-      targetY > 10
+      targetY > 24
     ) {
       return Response.json(
         { error: "invalid_destination" },
@@ -85,7 +105,7 @@ const protectedHandler = withSupabase(
       );
     }
 
-    if (blockedCells.has(`${targetX},${targetY}`)) {
+    if (isBlockedCell(targetX, targetY)) {
       return Response.json(
         { error: "blocked_destination" },
         { status: 409, headers: corsHeaders },
