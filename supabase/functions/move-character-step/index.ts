@@ -1,18 +1,129 @@
 import { withSupabase } from "npm:@supabase/server";
 
-const blockedCells = new Set([
-  "5,5",
-  "2,2",
-  "8,2",
-  "2,8",
-  "8,8",
-  "1,4",
-  "1,5",
-  "1,6",
-  "9,4",
-  "9,5",
-  "9,6",
-]);
+type GridPosition = {
+  x: number;
+  y: number;
+};
+
+const GRID_SIZE = 25;
+const MAX_PATH_LENGTH = 64;
+
+function gridKey(position: GridPosition) {
+  return `${position.x},${position.y}`;
+}
+
+function isInsideMap(position: GridPosition) {
+  return (
+    position.x >= 0 &&
+    position.x < GRID_SIZE &&
+    position.y >= 0 &&
+    position.y < GRID_SIZE
+  );
+}
+
+function isBlockedCell(x: number, y: number) {
+  if (x === 12 && y === 12) {
+    return true;
+  }
+
+  if (
+    (x === 8 && y === 8) ||
+    (x === 16 && y === 8) ||
+    (x === 8 && y === 16) ||
+    (x === 16 && y === 16)
+  ) {
+    return true;
+  }
+
+  if ((x === 5 || x === 19) && y >= 7 && y <= 17 && ![9, 12, 15].includes(y)) {
+    return true;
+  }
+
+  if ((y === 5 || y === 19) && x >= 7 && x <= 17 && ![9, 12, 15].includes(x)) {
+    return true;
+  }
+
+  if (
+    (x >= 2 && x <= 4 && y >= 2 && y <= 3) ||
+    (x >= 20 && x <= 22 && y >= 2 && y <= 3) ||
+    (x >= 2 && x <= 4 && y >= 21 && y <= 22) ||
+    (x >= 20 && x <= 22 && y >= 21 && y <= 22)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function isWalkable(position: GridPosition) {
+  return isInsideMap(position) && !isBlockedCell(position.x, position.y);
+}
+
+function getNeighbors(position: GridPosition) {
+  return [
+    { x: position.x + 1, y: position.y },
+    { x: position.x - 1, y: position.y },
+    { x: position.x, y: position.y + 1 },
+    { x: position.x, y: position.y - 1 },
+  ].filter(isWalkable);
+}
+
+function buildPath(from: GridPosition, to: GridPosition) {
+  if (!isWalkable(from) || !isWalkable(to)) {
+    return [] as GridPosition[];
+  }
+
+  const startKey = gridKey(from);
+  const targetKey = gridKey(to);
+  const queue: GridPosition[] = [{ ...from }];
+  const visited = new Set([startKey]);
+  const previous = new Map<string, GridPosition>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (!current) {
+      break;
+    }
+
+    if (gridKey(current) === targetKey) {
+      const path: GridPosition[] = [];
+      let cursor = { ...to };
+
+      while (gridKey(cursor) !== startKey) {
+        path.unshift(cursor);
+
+        if (path.length > MAX_PATH_LENGTH) {
+          return [];
+        }
+
+        const parent = previous.get(gridKey(cursor));
+
+        if (!parent) {
+          return [];
+        }
+
+        cursor = parent;
+      }
+
+      return path;
+    }
+
+    for (const neighbor of getNeighbors(current)) {
+      const neighborKey = gridKey(neighbor);
+
+      if (visited.has(neighborKey)) {
+        continue;
+      }
+
+      visited.add(neighborKey);
+      previous.set(neighborKey, current);
+      queue.push(neighbor);
+    }
+  }
+
+  return [] as GridPosition[];
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,14 +144,12 @@ const protectedHandler = withSupabase(
     const body = await req.json().catch(() => null);
     const targetX = body?.target_x;
     const targetY = body?.target_y;
+    const destination = { x: targetX, y: targetY };
 
     if (
       !Number.isInteger(targetX) ||
       !Number.isInteger(targetY) ||
-      targetX < 0 ||
-      targetX > 10 ||
-      targetY < 0 ||
-      targetY > 10
+      !isWalkable(destination)
     ) {
       return Response.json(
         { error: "invalid_destination" },
@@ -85,26 +194,16 @@ const protectedHandler = withSupabase(
       );
     }
 
-    if (blockedCells.has(`${targetX},${targetY}`)) {
-      return Response.json(
-        { error: "blocked_destination" },
-        { status: 409, headers: corsHeaders },
-      );
-    }
+    const start = {
+      x: character.grid_x,
+      y: character.grid_y,
+    };
 
-    const distance =
-      Math.abs(targetX - character.grid_x) +
-      Math.abs(targetY - character.grid_y);
+    const path = buildPath(start, destination);
 
-    if (distance !== 1) {
+    if (path.length === 0) {
       return Response.json(
-        {
-          error: "invalid_step",
-          position: {
-            x: character.grid_x,
-            y: character.grid_y,
-          },
-        },
+        { error: "path_not_found", position: start },
         { status: 409, headers: corsHeaders },
       );
     }
@@ -112,13 +211,13 @@ const protectedHandler = withSupabase(
     const { data: updated, error: updateError } = await ctx.supabaseAdmin
       .from("characters")
       .update({
-        grid_x: targetX,
-        grid_y: targetY,
+        grid_x: destination.x,
+        grid_y: destination.y,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId)
-      .eq("grid_x", character.grid_x)
-      .eq("grid_y", character.grid_y)
+      .eq("grid_x", start.x)
+      .eq("grid_y", start.y)
       .select("grid_x, grid_y, current_map")
       .maybeSingle();
 
@@ -139,6 +238,7 @@ const protectedHandler = withSupabase(
 
     return Response.json(
       {
+        path,
         position: {
           x: updated.grid_x,
           y: updated.grid_y,

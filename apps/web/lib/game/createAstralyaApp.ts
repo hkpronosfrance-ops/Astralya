@@ -8,6 +8,7 @@ import {
 import {
   ELYNDRA_BLOCKED_CELLS,
   ELYNDRA_GRID_SIZE,
+  ELYNDRA_TRANSITION_GATES,
   getElyndraTerrain,
   gridKey,
   isElyndraWalkable,
@@ -17,13 +18,13 @@ import {
 const TILE_WIDTH = 96;
 const TILE_HEIGHT = 48;
 const PLAYER_Y_OFFSET = -18;
-const STEP_DURATION_MS = 135;
+const STEP_DURATION_MS = 60;
 
 type AstralyaAppOptions = {
   displayName: string;
   startX: number;
   startY: number;
-  validateStep?: (position: GridPosition) => Promise<boolean>;
+  requestMove?: (destination: GridPosition) => Promise<GridPosition[] | null>;
   onMoveComplete?: () => void;
 };
 
@@ -53,9 +54,13 @@ function createTile(position: GridPosition) {
         ? parity === 0
           ? 0x17384b
           : 0x143246
-        : parity === 0
-          ? 0x10283b
-          : 0x0d2234;
+        : terrain === "district"
+          ? parity === 0
+            ? 0x173047
+            : 0x132a40
+          : parity === 0
+            ? 0x10283b
+            : 0x0d2234;
 
   tile
     .poly([
@@ -143,7 +148,7 @@ function createObstacle(position: GridPosition) {
   const obstacle = new Container();
   const key = gridKey(position);
 
-  if (key === "5,5") {
+  if (key === "12,12") {
     const water = new Graphics()
       .ellipse(0, 8, 34, 16)
       .fill({ color: 0x0e7490, alpha: 0.7 })
@@ -165,10 +170,10 @@ function createObstacle(position: GridPosition) {
 
     obstacle.addChild(water, pedestal, glow, crystal);
   } else if (
-    key === "2,2" ||
-    key === "8,2" ||
-    key === "2,8" ||
-    key === "8,8"
+    key === "8,8" ||
+    key === "16,8" ||
+    key === "8,16" ||
+    key === "16,16"
   ) {
     const base = new Graphics()
       .ellipse(0, 10, 25, 11)
@@ -209,6 +214,28 @@ function createObstacle(position: GridPosition) {
   return obstacle;
 }
 
+
+function createTransitionGate(position: GridPosition) {
+  const gate = new Container();
+  const ring = new Graphics()
+    .ellipse(0, 4, 27, 12)
+    .fill({ color: 0x0e7490, alpha: 0.22 })
+    .stroke({ color: 0x67e8f9, width: 2, alpha: 0.85 });
+
+  const inner = new Graphics()
+    .ellipse(0, 1, 16, 7)
+    .fill({ color: 0x22d3ee, alpha: 0.28 });
+
+  const spark = new Graphics()
+    .poly([0, -23, 7, -8, 0, -1, -7, -8])
+    .fill({ color: 0xe0f2fe, alpha: 0.9 });
+
+  gate.addChild(ring, inner, spark);
+  const screen = isoToScreen(position.x, position.y);
+  gate.position.set(screen.x, screen.y - 4);
+  return gate;
+}
+
 function createMapTitle() {
   const container = new Container();
   const title = new Text({
@@ -239,8 +266,8 @@ function createMapTitle() {
   subtitle.position.set(0, 24);
   container.addChild(title, subtitle);
 
-  const screen = isoToScreen(5, 0);
-  container.position.set(screen.x, screen.y - 92);
+  const screen = isoToScreen(12, 7);
+  container.position.set(screen.x, screen.y - 100);
   return container;
 }
 
@@ -422,24 +449,29 @@ export async function createAstralyaApp(
       return;
     }
 
-    const path = buildPath(currentPosition, destination);
+    moving = true;
+    moveTargetMarker(destination);
 
-    if (path.length === 0) {
+    const path =
+      (await options.requestMove?.(destination)) ??
+      buildPath(currentPosition, destination);
+
+    if (
+      disposed ||
+      path.length === 0 ||
+      gridKey(path[path.length - 1] ?? currentPosition) !== gridKey(destination)
+    ) {
+      targetMarker.visible = false;
+      clearPathPreview();
+      moving = false;
+      options.onMoveComplete?.();
       return;
     }
 
-    moving = true;
-    moveTargetMarker(destination);
     renderPathPreview(path);
 
     for (const step of path) {
       if (disposed) {
-        break;
-      }
-
-      const accepted = await options.validateStep?.(step);
-
-      if (accepted === false || disposed) {
         break;
       }
 
@@ -489,35 +521,51 @@ export async function createAstralyaApp(
     objectLayer.addChild(createObstacle(position));
   }
 
+  for (const position of ELYNDRA_TRANSITION_GATES) {
+    objectLayer.addChild(createTransitionGate(position));
+  }
+
   actorLayer.addChild(targetMarker);
   movePlayerToGrid(currentPosition);
   actorLayer.addChild(player);
 
-  const positionWorld = () => {
-    world.position.set(app.screen.width / 2, app.screen.height * 0.34);
-
-    const availableWidth = app.screen.width;
-    const availableHeight = app.screen.height * 0.72;
-    const gridWidth = ELYNDRA_GRID_SIZE * TILE_WIDTH;
-    const gridHeight = ELYNDRA_GRID_SIZE * TILE_HEIGHT;
-
-    const scale = Math.min(
-      1,
-      Math.max(
-        0.55,
-        Math.min(availableWidth / gridWidth, availableHeight / gridHeight),
-      ),
-    );
-
+  const updateCameraScale = () => {
+    const scale = app.screen.width < 640 ? 0.72 : app.screen.width < 1100 ? 0.82 : 0.92;
     world.scale.set(scale);
   };
 
-  positionWorld();
-  app.renderer.on("resize", positionWorld);
+  const snapCameraToPlayer = () => {
+    const scale = world.scale.x;
+    world.position.set(
+      app.screen.width / 2 - player.position.x * scale,
+      app.screen.height * 0.48 - player.position.y * scale,
+    );
+  };
+
+  const followPlayer = () => {
+    const scale = world.scale.x;
+    const targetX = app.screen.width / 2 - player.position.x * scale;
+    const targetY = app.screen.height * 0.48 - player.position.y * scale;
+    const smoothing = moving ? 0.24 : 0.2;
+
+    world.position.x += (targetX - world.position.x) * smoothing;
+    world.position.y += (targetY - world.position.y) * smoothing;
+  };
+
+  const handleResize = () => {
+    updateCameraScale();
+    snapCameraToPlayer();
+  };
+
+  updateCameraScale();
+  snapCameraToPlayer();
+  app.ticker.add(followPlayer);
+  app.renderer.on("resize", handleResize);
 
   return () => {
     disposed = true;
-    app.renderer.off("resize", positionWorld);
+    app.ticker.remove(followPlayer);
+    app.renderer.off("resize", handleResize);
     app.destroy(true, { children: true });
   };
 }

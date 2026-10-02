@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createAstralyaApp } from "@/lib/game/createAstralyaApp";
 import { createClient } from "@/lib/supabase/client";
+import {
+  getElyndraDistrict,
+  type GridPosition,
+} from "@/lib/game/maps/elyndraSpawn";
 
 type AstralyaGameProps = {
   displayName: string;
@@ -11,6 +15,11 @@ type AstralyaGameProps = {
   maxHp: number;
   startX: number;
   startY: number;
+};
+
+type MoveResponse = {
+  position?: GridPosition;
+  path?: GridPosition[];
 };
 
 export function AstralyaGame({
@@ -42,34 +51,36 @@ export function AstralyaGame({
       displayName,
       startX,
       startY,
-      validateStep: async (position) => {
+      requestMove: async (destination) => {
         if (disposed) {
-          return false;
+          return null;
         }
 
         setMovementStatus("moving");
 
-        const { data, error } = await supabase.functions.invoke(
+        const { data, error } = await supabase.functions.invoke<MoveResponse>(
           "move-character-step",
           {
             body: {
-              target_x: position.x,
-              target_y: position.y,
+              target_x: destination.x,
+              target_y: destination.y,
             },
           },
         );
 
         if (
           error ||
-          data?.position?.x !== position.x ||
-          data?.position?.y !== position.y
+          !Array.isArray(data?.path) ||
+          !data?.position ||
+          data.position.x !== destination.x ||
+          data.position.y !== destination.y
         ) {
           setMovementStatus("rejected");
-          return false;
+          return null;
         }
 
-        setServerPosition(position);
-        return true;
+        setServerPosition(data.position);
+        return data.path;
       },
       onMoveComplete: () => {
         if (!disposed) {
@@ -96,7 +107,7 @@ export function AstralyaGame({
 
   const statusLabel =
     movementStatus === "moving"
-      ? "Validation serveur..."
+      ? "Calcul du trajet..."
       : movementStatus === "rejected"
         ? "Déplacement refusé"
         : "Synchronisé";
@@ -120,15 +131,15 @@ export function AstralyaGame({
             </div>
           </div>
 
-          <div className="hud-card prototype-badge">Prototype 0.4</div>
+          <div className="hud-card prototype-badge">Prototype 0.5</div>
         </div>
 
         <div />
 
         <div className="hud-bottom">
           <div className="movement-hint hud-card">
-            <strong>Elyndra · Place Astrale</strong>
-            <span>Clique sur une case pour te déplacer.</span>
+            <strong>Elyndra · {getElyndraDistrict(serverPosition)}</strong>
+            <span>Clique sur une destination : le serveur calcule le trajet.</span>
             <small>
               Position serveur : {serverPosition.x}, {serverPosition.y}
             </small>
