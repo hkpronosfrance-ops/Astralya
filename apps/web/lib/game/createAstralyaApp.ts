@@ -21,7 +21,8 @@ type AstralyaAppOptions = {
   displayName: string;
   startX: number;
   startY: number;
-  onPositionChange?: (position: GridPosition) => void;
+  validateStep?: (position: GridPosition) => Promise<boolean>;
+  onMoveComplete?: () => void;
 };
 
 function clampGridCoordinate(value: number) {
@@ -225,15 +226,21 @@ export async function createAstralyaApp(
         break;
       }
 
+      const accepted = await options.validateStep?.(step);
+
+      if (accepted === false || disposed) {
+        break;
+      }
+
       const from = { ...currentPosition };
       await animateStep(player, from, step, () => disposed);
       currentPosition.x = step.x;
       currentPosition.y = step.y;
-      options.onPositionChange?.({ ...currentPosition });
     }
 
     targetMarker.visible = false;
     moving = false;
+    options.onMoveComplete?.();
   };
 
   for (let x = 0; x < GRID_SIZE; x += 1) {
