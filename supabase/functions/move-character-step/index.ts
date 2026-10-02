@@ -1,5 +1,19 @@
 import { withSupabase } from "npm:@supabase/server";
 
+const blockedCells = new Set([
+  "5,5",
+  "2,2",
+  "8,2",
+  "2,8",
+  "8,8",
+  "1,4",
+  "1,5",
+  "1,6",
+  "9,4",
+  "9,5",
+  "9,6",
+]);
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -67,6 +81,13 @@ const protectedHandler = withSupabase(
     if (character.current_map !== "elyndra_spawn") {
       return Response.json(
         { error: "unsupported_map" },
+        { status: 409, headers: corsHeaders },
+      );
+    }
+
+    if (blockedCells.has(`${targetX},${targetY}`)) {
+      return Response.json(
+        { error: "blocked_destination" },
         { status: 409, headers: corsHeaders },
       );
     }
