@@ -120,14 +120,14 @@ export function AstralyaGame({
             </div>
           </div>
 
-          <div className="hud-card prototype-badge">Prototype 0.3</div>
+          <div className="hud-card prototype-badge">Prototype 0.4</div>
         </div>
 
         <div />
 
         <div className="hud-bottom">
           <div className="movement-hint hud-card">
-            <strong>Exploration</strong>
+            <strong>Elyndra · Place Astrale</strong>
             <span>Clique sur une case pour te déplacer.</span>
             <small>
               Position serveur : {serverPosition.x}, {serverPosition.y}
